@@ -1,3 +1,33 @@
+/*
+Copyright (c) 2017, Hilton Bristow
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #ifndef ARGPARSE_HPP_
 #define ARGPARSE_HPP_
 
@@ -42,7 +72,7 @@ typedef std::map<std::string, size_t> IndexMap;
 class ArgumentParser {
 private:
     class Any;
-    class Argument;
+    struct Argument;
     class PlaceHolder;
     class Holder;
     typedef std::string String;
@@ -139,9 +169,9 @@ private:
     }
 
     struct Argument {
-        Argument() : short_name(""), name(""), optional(true), fixed_nargs(0), fixed(true) {}
+        Argument() : short_name(""), name(""), optional(true), used(false), fixed_nargs(0), fixed(true) {}
         Argument(const String& _short_name, const String& _name, bool _optional, char nargs)
-                : short_name(_short_name), name(_name), optional(_optional) {
+                : short_name(_short_name), name(_name), optional(_optional), used(false) {
             if (nargs == '+' || nargs == '*') {
                 variable_nargs = nargs;
                 fixed = false;
@@ -153,6 +183,7 @@ private:
         String short_name;
         String name;
         bool optional;
+        bool used;
         union {
             size_t fixed_nargs;
             char variable_nargs;
@@ -301,6 +332,7 @@ public:
                                       .append(active_name),
                                   true);
                 active = arguments_[index_[el]];
+                arguments_[index_[el]].used = true;
                 // check if we've satisfied the required arguments
                 if (active.optional && nrequired > 0)
                     argumentError(String("encountered optional argument ")
@@ -416,7 +448,16 @@ public:
         arguments_.clear();
         variables_.clear();
     }
-    bool exists(const String& name) const { return index_.count(delimit(name)) > 0; }
+    bool exists(const String& name) {
+        #if __cplusplus >= 201103L
+        std::unordered_map<std::string, size_t>::const_iterator
+        #else
+        std::map<std::string, size_t>::const_iterator
+        #endif
+        vIt = index_.find(delimit(name));
+
+        return (vIt != index_.end() && arguments_[vIt->second].used);
+	}
     size_t count(const String& name) {
         // check if the name is an argument
         if (index_.count(delimit(name)) == 0) return 0;
